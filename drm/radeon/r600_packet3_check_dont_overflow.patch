@@ -1,0 +1,22 @@
+radeon/r600_cs::packet3_check(): Don't overflow on PACKET3_SET_RESOURCE
+
+According to the spec there're only 7 data words on R6xx for SET_RESOURCE
+packets (SQ_TEX_RESOURCE_WORD[0-6]_0, SQ_VTX_CONSTANT_WORD[0-6]_0).
+Luckily there didn't seem to be multiple resources committed at once. Anyway,
+don't try to access the non-existing 8th element.
+
+diff --git a/drivers/gpu/drm/radeon/r600_cs.c b/drivers/gpu/drm/radeon/r600_cs.c
+index acc1f99..ad7de1b 100644
+--- a/drivers/gpu/drm/radeon/r600_cs.c
++++ b/drivers/gpu/drm/radeon/r600_cs.c
+@@ -2007,8 +2013,8 @@ static int r600_packet3_check(struct radeon_cs_parser *p,
+ 				}
+ 
+ 				offset64 = reloc->gpu_offset + offset;
+-				ib[idx+1+(i*8)+0] = offset64;
+-				ib[idx+1+(i*8)+2] = (ib[idx+1+(i*8)+2] & 0xffffff00) |
++				ib[idx+1+(i*7)+0] = offset64;
++				ib[idx+1+(i*7)+2] = (ib[idx+1+(i*7)+2] & 0xffffff00) |
+ 						    (upper_32_bits(offset64) & 0xff);
+ 				break;
+ 			}

@@ -1,0 +1,19 @@
+radeon/evergreen_cs::evergreen_cs_check_reg(): Fix htile_offset.
+
+According to the spec DB_HTILE_DATA_BASE[31:0] is HTileData surface[39:8],
+so shift it properly as r600_cs does as well. Otherwise the offset for the
+bo_size check would probably be too small most of the time.
+
+diff --git a/drivers/gpu/drm/radeon/evergreen_cs.c b/drivers/gpu/drm/radeon/evergreen_cs.c
+index c9e0fbb..29f75af 100644
+--- a/drivers/gpu/drm/radeon/evergreen_cs.c
++++ b/drivers/gpu/drm/radeon/evergreen_cs.c
+@@ -1606,7 +1608,7 @@ static int evergreen_cs_check_reg(struct radeon_cs_parser *p, u32 reg, u32 idx)
+ 					"0x%04X\n", reg);
+ 			return -EINVAL;
+ 		}
+-		track->htile_offset = radeon_get_ib_value(p, idx);
++		track->htile_offset = radeon_get_ib_value(p, idx) << 8;
+ 		ib[idx] += (u32)((reloc->gpu_offset >> 8) & 0xffffffff);
+ 		track->htile_bo = reloc->robj;
+ 		track->db_dirty = true;

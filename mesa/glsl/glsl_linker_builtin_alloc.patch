@@ -1,0 +1,71 @@
+glsl/linker: Don't lazy alloc + move for builtins
+
+Just allocate/free the space for the possibly builtins (one entry) right away,
+instead of having to copy/move the whole list when builtins are found to be used.
+
+diff --git a/src/glsl/linker.cpp b/src/glsl/linker.cpp
+index 48dd2d3..14b5f6b 100644
+--- a/src/glsl/linker.cpp
++++ b/src/glsl/linker.cpp
+@@ -2088,7 +2088,11 @@ link_intrastage_shaders(void *mem_ctx,
+       move_non_declarations(linked->ir, (exec_node *) &main_sig->body, false,
+ 			    linked);
+ 
++   bool need_builtins = false;
+    for (unsigned i = 0; i < num_shaders; i++) {
++      /* Check if any shader needs built-in functions. */
++      if (shader_list[i]->uses_builtin_functions)
++         need_builtins = true;
+       if (shader_list[i] == main)
+ 	 continue;
+ 
+@@ -2096,35 +2100,14 @@ link_intrastage_shaders(void *mem_ctx,
+ 					      insertion_point, true, linked);
+    }
+ 
+-   /* Check if any shader needs built-in functions. */
+-   bool need_builtins = false;
+-   for (unsigned i = 0; i < num_shaders; i++) {
+-      if (shader_list[i]->uses_builtin_functions) {
+-         need_builtins = true;
+-         break;
+-      }
+-   }
+-
+    bool ok;
+    if (need_builtins) {
+-      /* Make a temporary array one larger than shader_list, which will hold
+-       * the built-in function shader as well.
++      /*
++       * Use the one entry we additionally allocated before.
+        */
+-      gl_shader **linking_shaders = (gl_shader **)
+-         calloc(num_shaders + 1, sizeof(gl_shader *));
+-
+-      ok = linking_shaders != NULL;
+-
+-      if (ok) {
+-         memcpy(linking_shaders, shader_list, num_shaders * sizeof(gl_shader *));
+-         linking_shaders[num_shaders] = _mesa_glsl_get_builtin_function_shader();
+-
+-         ok = link_function_calls(prog, linked, linking_shaders, num_shaders + 1);
+-
+-         free(linking_shaders);
+-      } else {
+-         _mesa_error_no_memory(__func__);
+-      }
++       shader_list[num_shaders] = _mesa_glsl_get_builtin_function_shader();
++       ok = link_function_calls(prog, linked, shader_list, num_shaders + 1);
++       shader_list[num_shaders] = NULL;
+    } else {
+       ok = link_function_calls(prog, linked, shader_list, num_shaders);
+    }
+@@ -3962,7 +3945,7 @@ link_shaders(struct gl_context *ctx, struct gl_shader_program *prog)
+ 
+    for (int i = 0; i < MESA_SHADER_STAGES; i++) {
+       shader_list[i] = (struct gl_shader **)
+-         calloc(prog->NumShaders, sizeof(struct gl_shader *));
++         calloc(prog->NumShaders + 1 /* one for possible builtin */, sizeof(struct gl_shader *));
+       num_shaders[i] = 0;
+    }
+ 

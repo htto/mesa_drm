@@ -1,0 +1,15 @@
+glsl/glsl_types: Key doesn't need to be that big.
+
+diff --git a/src/glsl/nir/glsl_types.cpp b/src/glsl/nir/glsl_types.cpp
+index 1c66dce..75dd43c 100644
+--- a/src/glsl/nir/glsl_types.cpp
++++ b/src/glsl/nir/glsl_types.cpp
+@@ -686,7 +686,7 @@ glsl_type::get_array_instance(const glsl_type *base, unsigned array_size)
+     * shaders.  For example, two shaders may have different record types
+     * named 'foo'.
+     */
+-   char key[128];
++   char key[32]; // max 30 chars: <max 2+16>[<max 10>]\0
+    snprintf(key, sizeof(key), "%p[%u]", (void *) base, array_size);
+ 
+    mtx_lock(&glsl_type::mutex);
